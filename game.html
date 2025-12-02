@@ -14,14 +14,13 @@
 
 <script>
 /* ============================================================
-    ROGUELIKE SHOOTER — SINGLE FILE EDITION
-    All systems are separated into clear blocks for easy editing
+    ROGUELIKE SHOOTER — SINGLE FILE EDITION (WITH STARTER WEAPON)
 ============================================================ */
 
 
 
 /* ============================================================
-    ========== CANVAS & BASIC SETUP ==========
+    CANVAS SETUP
 ============================================================ */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -40,22 +39,16 @@ window.onkeyup   = e => keys[e.key] = false;
 
 
 /* ============================================================
-    ========== UTILITY FUNCTIONS ==========
+    UTILITY FUNCTIONS
 ============================================================ */
-function dist(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
-function angle(a, b) {
-    return Math.atan2(b.y - a.y, b.x - a.x);
-}
-function rand(min, max) {
-    return Math.random() * (max - min) + min;
-}
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function angle(a, b) { return Math.atan2(b.y - a.y, b.x - a.x); }
+function rand(min, max) { return Math.random() * (max-min) + min; }
 
 
 
 /* ============================================================
-    ========== PLAYER ==========
+    PLAYER
 ============================================================ */
 const player = {
     x: innerWidth / 2,
@@ -70,17 +63,15 @@ const player = {
 
 
 /* ============================================================
-    ========== ENEMY SYSTEM ==========
-    - Easy to add new enemies
+    ENEMY SYSTEM
 ============================================================ */
-
 const ENEMY_TYPES = {
-    circle:   { speed:120, hp:40,  color:"red",      shape:"circle",   canBePoisoned:true },
-    triangle: { speed:200, hp:20,  color:"#ff7777",  shape:"triangle", canBePoisoned:true },
-    square:   { speed:70,  hp:100, color:"#990000",  shape:"square",   canBePoisoned:true },
+    circle:   { speed:120, hp:40,  color:"red",      shape:"circle",   canBePoisoned:true  },
+    triangle: { speed:200, hp:20,  color:"#ff7777",  shape:"triangle", canBePoisoned:true  },
+    square:   { speed:70,  hp:100, color:"#990000",  shape:"square",   canBePoisoned:true  },
     octagon:  { speed:120, hp:120, color:"green",    shape:"circle",   canBePoisoned:false },
-    pentagon: { speed:180, hp:60,  color:"purple",   shape:"circle",   canBePoisoned:true },
-    hexagon:  { speed:50,  hp:400, color:"yellow",   shape:"circle",   canBePoisoned:true }
+    pentagon: { speed:180, hp:60,  color:"purple",   shape:"circle",   canBePoisoned:true  },
+    hexagon:  { speed:50,  hp:400, color:"yellow",   shape:"circle",   canBePoisoned:true  }
 };
 
 class Enemy {
@@ -95,7 +86,6 @@ class Enemy {
         this.color = t.color;
         this.shape = t.shape;
         this.canBePoisoned = t.canBePoisoned;
-
         this.poisonTime = 0;
         this.poisonDamage = 0;
     }
@@ -112,7 +102,6 @@ class Enemy {
     }
 
     draw(ctx) {
-        // Enemy shape
         ctx.fillStyle = (this.poisonTime > 0 && this.canBePoisoned) ? "green" : this.color;
         ctx.beginPath();
 
@@ -120,14 +109,12 @@ class Enemy {
             case "circle":
                 ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
                 break;
-
             case "triangle":
                 ctx.moveTo(this.x, this.y - 20);
                 ctx.lineTo(this.x + 20, this.y + 20);
                 ctx.lineTo(this.x - 20, this.y + 20);
                 ctx.closePath();
                 break;
-
             case "square":
                 ctx.rect(this.x - 20, this.y - 20, 40, 40);
                 break;
@@ -156,8 +143,7 @@ class Enemy {
 
 
 /* ============================================================
-    ========== WAVE SYSTEM ==========
-    - Easy to add or edit waves
+    WAVE SYSTEM
 ============================================================ */
 const WAVES = [
     { circle: 5 },
@@ -182,12 +168,12 @@ function spawnWave() {
     for (let type in config) {
         for (let i = 0; i < config[type]; i++) {
             let x, y;
-            let side = Math.floor(Math.random() * 4);
+            let s = Math.floor(Math.random() * 4);
 
-            if (side === 0) { x = 0; y = rand(0, innerHeight); }
-            if (side === 1) { x = innerWidth; y = rand(0, innerHeight); }
-            if (side === 2) { x = rand(0, innerWidth); y = 0; }
-            if (side === 3) { x = rand(0, innerWidth); y = innerHeight; }
+            if (s === 0) { x = 0; y = rand(0, innerHeight); }
+            if (s === 1) { x = innerWidth; y = rand(0, innerHeight); }
+            if (s === 2) { x = rand(0, innerWidth); y = 0; }
+            if (s === 3) { x = rand(0, innerWidth); y = innerHeight; }
 
             enemies.push(new Enemy(x, y, type));
         }
@@ -199,30 +185,32 @@ spawnWave();
 
 
 /* ============================================================
-    ========== WEAPON SYSTEM ==========
-    (Stub — easy to fill in)
+    WEAPON SYSTEM
+    (Full weapon behaviors can be added next)
 ============================================================ */
 let weapons = [];
 
 function addWeapon(type) {
-    weapons.push({ type, cooldown: 0, level: 1 });
+    weapons.push({ type, level: 1, cooldown: 0 });
 }
 
 function updateWeapons(dt) {
     for (let w of weapons) {
         w.cooldown -= dt;
 
-        // Weapon logic goes here
-        // I can fully implement these for you next
+        // Weapon logic goes here (I can add them later)
     }
 }
+
+// ★★★ GIVE PLAYER RANDOM STARTING WEAPON ★★★
+const STARTING_WEAPONS = ["orb", "homeshot", "buckshot", "rocket", "zap", "scythe", "ring"];
+addWeapon( STARTING_WEAPONS[Math.floor(Math.random() * STARTING_WEAPONS.length)] );
 
 
 
 /* ============================================================
-    ========== MAIN GAME LOOP ==========
+    MAIN LOOP
 ============================================================ */
-
 let last = 0;
 function gameLoop(ts) {
     const dt = (ts - last) / 1000;
@@ -241,19 +229,15 @@ requestAnimationFrame(gameLoop);
     UPDATE
 ============================================================ */
 function update(dt) {
-    // Player movement
     if (keys["w"]) player.y -= player.speed * dt;
     if (keys["s"]) player.y += player.speed * dt;
     if (keys["a"]) player.x -= player.speed * dt;
     if (keys["d"]) player.x += player.speed * dt;
 
-    // Update weapons
     updateWeapons(dt);
 
-    // Enemies
     for (let e of enemies) e.update(dt);
 
-    // Cleanup dead
     for (let i = enemies.length - 1; i >= 0; i--) {
         if (enemies[i].hp <= 0) {
             player.xp += 10;
@@ -261,13 +245,11 @@ function update(dt) {
         }
     }
 
-    // Next wave
     if (enemies.length === 0) {
         wave++;
         if (wave < WAVES.length) spawnWave();
     }
 
-    // Leveling
     const need = player.level * 50;
     if (player.xp >= need) {
         player.xp -= need;
