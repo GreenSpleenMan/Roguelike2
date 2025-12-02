@@ -4,29 +4,27 @@
 <meta charset="UTF-8">
 <title>Roguelike Shooter</title>
 <style>
-    body { margin:0; overflow:hidden; background:white; }
-    canvas { display:block; }
+body{margin:0;overflow:hidden;background:white;}
+canvas{display:block;}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-
 <script>
-/* ============================================================
-    ROGUELIKE SHOOTER — SINGLE FILE EDITION (Functional Weapons)
-============================================================ */
-
 /* ================= CANVAS ================= */
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
+window.onresize=resize;resize();
 
-function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
-window.onresize = resize;
-resize();
+let keys={};
+window.onkeydown=e=>keys[e.key]=true;
+window.onkeyup=e=>keys[e.key]=false;
 
-let keys = {};
-window.onkeydown = e => keys[e.key] = true;
-window.onkeyup   = e => keys[e.key] = false;
+let mouseX=0, mouseY=0, mouseClick=false;
+canvas.addEventListener('mousemove',e=>{mouseX=e.clientX; mouseY=e.clientY;});
+canvas.addEventListener('mousedown',e=>{mouseClick=true;});
+canvas.addEventListener('mouseup',e=>{mouseClick=false;});
 
 /* ================= UTILS ================= */
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
@@ -34,209 +32,252 @@ function angle(a,b){return Math.atan2(b.y-a.y,b.x-a.x);}
 function rand(min,max){return Math.random()*(max-min)+min;}
 
 /* ================= PLAYER ================= */
-const player = {
-    x: innerWidth/2,
-    y: innerHeight/2,
-    speed: 250,
-    hp: 100,
-    maxHp: 100,
-    xp: 0,
-    level: 1
+const player={
+    x:innerWidth/2,y:innerHeight/2,
+    speed:250,
+    hp:100,maxHp:100,
+    xp:0,level:1,
+    weapons:[],selectedWeapon:null
 };
 
 /* ================= ENEMIES ================= */
-const ENEMY_TYPES = {
-    circle:   { speed:120, hp:40,  color:"red",      shape:"circle",   canBePoisoned:true  },
-    triangle: { speed:200, hp:20,  color:"#ff7777",  shape:"triangle", canBePoisoned:true  },
-    square:   { speed:70,  hp:100, color:"#990000",  shape:"square",   canBePoisoned:true  },
-    octagon:  { speed:120, hp:120, color:"green",    shape:"circle",   canBePoisoned:false },
-    pentagon: { speed:180, hp:60,  color:"purple",   shape:"circle",   canBePoisoned:true  },
-    hexagon:  { speed:50,  hp:400, color:"yellow",   shape:"circle",   canBePoisoned:true  }
+const ENEMY_TYPES={
+circle:{speed:120,hp:40,color:"red",shape:"circle",canBePoisoned:true},
+triangle:{speed:200,hp:20,color:"#ff7777",shape:"triangle",canBePoisoned:true},
+square:{speed:70,hp:100,color:"#990000",shape:"square",canBePoisoned:true},
+octagon:{speed:120,hp:120,color:"green",shape:"circle",canBePoisoned:false},
+pentagon:{speed:180,hp:60,color:"purple",shape:"circle",canBePoisoned:true},
+hexagon:{speed:50,hp:400,color:"yellow",shape:"circle",canBePoisoned:true}
 };
 
-class Enemy {
+class Enemy{
     constructor(x,y,type){
-        const t = ENEMY_TYPES[type];
-        this.x = x; this.y = y; this.type = type;
-        this.speed = t.speed; this.hp = t.hp; this.maxHp = t.hp;
-        this.color = t.color; this.shape = t.shape;
-        this.canBePoisoned = t.canBePoisoned;
-        this.poisonTime = 0; this.poisonDamage = 0;
+        const t=ENEMY_TYPES[type];
+        this.x=x;this.y=y;this.type=type;
+        this.speed=t.speed;this.hp=t.hp;this.maxHp=t.hp;
+        this.color=t.color;this.shape=t.shape;this.canBePoisoned=t.canBePoisoned;
+        this.poisonTime=0;this.poisonDamage=0;
     }
     update(dt){
-        const ang = angle(this,player);
-        this.x += Math.cos(ang)*this.speed*dt;
-        this.y += Math.sin(ang)*this.speed*dt;
-
-        if(this.poisonTime>0){ this.poisonTime-=dt; this.hp -= this.poisonDamage*dt; }
-
-        // Enemy touches player
-        if(dist(this,player)<40){ 
-            player.hp -= 30*dt; // damage per second when touching
-        }
+        const ang=angle(this,player);
+        this.x+=Math.cos(ang)*this.speed*dt;
+        this.y+=Math.sin(ang)*this.speed*dt;
+        if(this.poisonTime>0){this.poisonTime-=dt;this.hp-=this.poisonDamage*dt;}
+        // contact damage
+        if(dist(this,player)<40){player.hp-=5*dt;}
     }
     draw(ctx){
-        ctx.fillStyle = (this.poisonTime>0 && this.canBePoisoned)?"green":this.color;
+        ctx.fillStyle=(this.poisonTime>0 && this.canBePoisoned)?"green":this.color;
         ctx.beginPath();
         switch(this.shape){
-            case "circle": ctx.arc(this.x,this.y,20,0,Math.PI*2); break;
-            case "triangle": ctx.moveTo(this.x,this.y-20); ctx.lineTo(this.x+20,this.y+20); ctx.lineTo(this.x-20,this.y+20); ctx.closePath(); break;
-            case "square": ctx.rect(this.x-20,this.y-20,40,40); break;
+            case "circle":ctx.arc(this.x,this.y,20,0,Math.PI*2);break;
+            case "triangle":ctx.moveTo(this.x,this.y-20);ctx.lineTo(this.x+20,this.y+20);ctx.lineTo(this.x-20,this.y+20);ctx.closePath();break;
+            case "square":ctx.rect(this.x-20,this.y-20,40,40);break;
         }
         ctx.fill();
-
-        // Health bar
+        // health bar
         const w=40,h=6,bx=this.x-w/2,by=this.y-32;
-        ctx.fillStyle="black"; ctx.fillRect(bx-1,by-1,w+2,h+2);
-        ctx.fillStyle="#660000"; ctx.fillRect(bx,by,w,h);
+        ctx.fillStyle="black";ctx.fillRect(bx-1,by-1,w+2,h+2);
+        ctx.fillStyle="#660000";ctx.fillRect(bx,by,w,h);
         const pct=Math.max(0,this.hp/this.maxHp);
-        ctx.fillStyle=pct<0.3?"red":"limegreen"; ctx.fillRect(bx,by,w*pct,h);
+        ctx.fillStyle=pct<0.3?"red":"limegreen";ctx.fillRect(bx,by,w*pct,h);
     }
 }
 
 /* ================= WAVES ================= */
 const WAVES=[
-    {circle:5},{circle:10,triangle:1},{circle:7,triangle:3,square:1},{circle:10,triangle:5,square:2},
-    {circle:2,triangle:10,square:5},{circle:5,triangle:5,square:5},{circle:1,triangle:2,square:3,octagon:1},
-    {circle:10,triangle:5,square:3,octagon:3},{pentagon:1},{circle:5,triangle:5,square:5,octagon:5,pentagon:5,hexagon:1}
+{circle:5},{circle:10,triangle:1},{circle:7,triangle:3,square:1},{circle:10,triangle:5,square:2},
+{circle:2,triangle:10,square:5},{circle:5,triangle:5,square:5},{circle:1,triangle:2,square:3,octagon:1},
+{circle:10,triangle:5,square:3,octagon:3},{pentagon:1},{circle:5,triangle:5,square:5,octagon:5,pentagon:5,hexagon:1}
 ];
-let wave=0; let enemies=[];
+let wave=0,enemies=[];
 function spawnWave(){
     if(wave>=WAVES.length)return;
-    const config=WAVES[wave];
-    for(let type in config){
-        for(let i=0;i<config[type];i++){
+    const cfg=WAVES[wave];
+    for(let t in cfg){
+        for(let i=0;i<cfg[t];i++){
             let x,y,side=Math.floor(Math.random()*4);
             if(side===0){x=0;y=rand(0,innerHeight);}
             if(side===1){x=innerWidth;y=rand(0,innerHeight);}
             if(side===2){x=rand(0,innerWidth);y=0;}
             if(side===3){x=rand(0,innerWidth);y=innerHeight;}
-            enemies.push(new Enemy(x,y,type));
+            enemies.push(new Enemy(x,y,t));
         }
     }
 }
-spawnWave();
 
-/* ================= WEAPONS ================= */
-let weapons=[];
+/* ================= WEAPONS & BULLETS ================= */
 let bullets=[];
+class Bullet{
+    constructor(x,y,dx,dy,dmg,lifetime,extra){
+        this.x=x;this.y=y;this.dx=dx;this.dy=dy;this.dmg=dmg;
+        this.lifetime=lifetime||0;this.extra=extra||{};
+    }
+    update(dt){
+        this.x+=this.dx*dt; this.y+=this.dy*dt;
+        if(this.lifetime>0){this.lifetime-=dt;if(this.lifetime<=0)return false;}
+        // collision with enemies
+        for(let e of enemies){
+            if(dist(this,e)<25){
+                if(this.extra.poison && e.canBePoisoned){e.poisonTime=this.extra.poisonTime;e.poisonDamage=this.extra.poisonDamage;}
+                e.hp-=this.dmg;
+                return false;
+            }
+        }
+        // offscreen
+        if(this.x<0||this.x>canvas.width||this.y<0||this.y>canvas.height)return false;
+        return true;
+    }
+    draw(ctx){ctx.fillStyle="black";ctx.beginPath();ctx.arc(this.x,this.y,5,0,Math.PI*2);ctx.fill();}
+}
 
-function addWeapon(type){weapons.push({type,level:1,cooldown:0});}
-function updateWeapons(dt){
-    for(let w of weapons){
-        w.cooldown-=dt;
-        if(keys[" "] && w.cooldown<=0){
-            if(w.type==="buckshot"){
-                for(let i=-2;i<=2;i++){
-                    const angleRad = i*0.2 + Math.atan2(mouseY-player.y,mouseX-player.x);
-                    bullets.push({x:player.x,y:player.y,dx:Math.cos(angleRad)*500,dy:Math.sin(angleRad)*500,dmg:10});
-                }
-                w.cooldown = 0.5;
-            }
-            if(w.type==="homeshot"){
-                if(enemies.length>0){
-                    let nearest=enemies[0],d=dist(player,enemies[0]);
-                    for(let e of enemies){let dd=dist(player,e); if(dd<d){nearest=e;d=dd;}}
-                    const ang = Math.atan2(nearest.y-player.y,nearest.x-player.x);
-                    bullets.push({x:player.x,y:player.y,dx:Math.cos(ang)*300,dy:Math.sin(ang)*300,dmg:15});
-                }
-                w.cooldown=0.4;
-            }
-            if(w.type==="orb"){
-                // simple rotating orb example
-                const num=1, radius=50;
-                for(let i=0;i<num;i++){
-                    const angleRad = Date.now()/300 + i*(Math.PI*2/num);
-                    bullets.push({x:player.x+Math.cos(angleRad)*radius, y:player.y+Math.sin(angleRad)*radius, dx:0, dy:0, dmg:20, lifetime:0.1});
-                }
-                w.cooldown=0.1;
+/* ================= WEAPON SELECTION ================= */
+const ALL_WEAPONS=["orb","homeshot","buckshot","rocket","zap","scythe","ring"];
+let choosingWeapon=true,weaponCards=[];
+function startWeaponSelection(){
+    weaponCards=[];
+    while(weaponCards.length<3){
+        const w=ALL_WEAPONS[Math.floor(Math.random()*ALL_WEAPONS.length)];
+        if(!weaponCards.includes(w))weaponCards.push(w);
+    }
+}
+startWeaponSelection();
+canvas.addEventListener('click',function(){
+    if(choosingWeapon){
+        for(let i=0;i<weaponCards.length;i++){
+            const cx=canvas.width/2-150+i*150,cy=canvas.height/2-75;
+            if(mouseX>cx && mouseX<cx+100 && mouseY>cy && mouseY<cy+100){
+                player.weapons.push({type:weaponCards[i],level:1,cooldown:0});
+                player.selectedWeapon=player.weapons[0];
+                choosingWeapon=false;
+                spawnWave();
             }
         }
     }
-}
-
-/* ================= BULLETS ================= */
-function updateBullets(dt){
-    for(let i=bullets.length-1;i>=0;i--){
-        let b=bullets[i];
-        b.x+=b.dx*dt; b.y+=b.dy*dt;
-        if(b.lifetime!==undefined){b.lifetime-=dt; if(b.lifetime<=0){bullets.splice(i,1); continue;}}
-
-        // Collision with enemies
-        for(let j=enemies.length-1;j>=0;j--){
-            let e=enemies[j];
-            if(dist(b,e)<25){
-                e.hp-=b.dmg;
-                bullets.splice(i,1);
-                break;
-            }
-        }
-
-        // remove if offscreen
-        if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) bullets.splice(i,1);
-    }
-}
-
-/* ================= STARTING WEAPON ================= */
-const STARTING_WEAPONS=["buckshot","homeshot","orb","rocket","zap","scythe","ring"];
-addWeapon(STARTING_WEAPONS[Math.floor(Math.random()*STARTING_WEAPONS.length)]);
-
-/* ================= MAIN LOOP ================= */
-let last=0; let mouseX=innerWidth/2, mouseY=innerHeight/2;
-window.onmousemove = e => {mouseX=e.clientX; mouseY=e.clientY;}
-function gameLoop(ts){
-    const dt=(ts-last)/1000;
-    last=ts;
-    update(dt); draw();
-    requestAnimationFrame(gameLoop);
-}
-requestAnimationFrame(gameLoop);
+});
 
 /* ================= UPDATE ================= */
 function update(dt){
+    if(choosingWeapon)return;
     if(keys["w"]) player.y-=player.speed*dt;
     if(keys["s"]) player.y+=player.speed*dt;
     if(keys["a"]) player.x-=player.speed*dt;
     if(keys["d"]) player.x+=player.speed*dt;
 
-    updateWeapons(dt);
-    updateBullets(dt);
-
-    for(let e of enemies) e.update(dt);
-
-    for(let i=enemies.length-1;i>=0;i--){
-        if(enemies[i].hp<=0){player.xp+=10; enemies.splice(i,1);}
+    // weapon firing
+    for(let w of player.weapons){
+        w.cooldown-=dt;
+        if(keys[" "] && w.cooldown<=0){
+            fireWeapon(w);
+        }
     }
 
-    if(enemies.length===0){wave++; if(wave<WAVES.length)spawnWave();}
+    // update bullets
+    for(let i=bullets.length-1;i>=0;i--){if(!bullets[i].update(dt)) bullets.splice(i,1);}
+    // update enemies
+    for(let i=enemies.length-1;i>=0;i--){enemies[i].update(dt);if(enemies[i].hp<=0){player.xp+=10; enemies.splice(i,1);}}
 
-    const need=player.level*50;
-    if(player.xp>=need){player.xp-=need; player.level++;}
+    if(enemies.length===0){wave++;spawnWave();}
+
+    const need=player.level*50;if(player.xp>=need){player.xp-=need;player.level++;}
+}
+
+/* ================= FIRE WEAPON ================= */
+function fireWeapon(w){
+    if(!player.selectedWeapon)return;
+    const mx=mouseX,my=mouseY;
+    if(w.type==="buckshot"){
+        for(let i=-2;i<=2;i++){
+            const ang=i*0.2 + Math.atan2(my-player.y,mx-player.x);
+            bullets.push(new Bullet(player.x,player.y,Math.cos(ang)*500,Math.sin(ang)*500,10));
+        }
+        w.cooldown=0.5;
+    }else if(w.type==="homeshot"){
+        if(enemies.length>0){
+            let nearest=enemies[0],d=dist(player,enemies[0]);
+            for(let e of enemies){let dd=dist(player,e);if(dd<d){nearest=e;d=dd;}}
+            const ang=Math.atan2(nearest.y-player.y,nearest.x-player.x);
+            bullets.push(new Bullet(player.x,player.y,Math.cos(ang)*300,Math.sin(ang)*300,15));
+        }
+        w.cooldown=0.4;
+    }else if(w.type==="orb"){
+        const num=1,radius=50;
+        for(let i=0;i<num;i++){
+            const angleRad=Date.now()/300 + i*(Math.PI*2/num);
+            bullets.push(new Bullet(player.x+Math.cos(angleRad)*radius,player.y+Math.sin(angleRad)*radius,0,0,20,0.1));
+        }
+        w.cooldown=0.1;
+    }else if(w.type==="rocket"){
+        const ang=Math.atan2(my-player.y,mx-player.x);
+        bullets.push(new Bullet(player.x,player.y,Math.cos(ang)*250,Math.sin(ang)*250,50,5,{splash:30}));
+        w.cooldown=1.2;
+    }else if(w.type==="zap"){
+        const chain=2;
+        if(enemies.length>0){
+            let e=enemies[Math.floor(Math.random()*enemies.length)];
+            bullets.push(new Bullet(player.x,player.y,0,0,30,0,{zap:e,chain:chain}));
+        }
+        w.cooldown=0.8;
+    }else if(w.type==="scythe"){
+        if(enemies.length>0){
+            let e=enemies[Math.floor(Math.random()*enemies.length)];
+            const ang=Math.atan2(e.y-player.y,e.x-player.x);
+            bullets.push(new Bullet(player.x,player.y,Math.cos(ang)*400,Math.sin(ang)*400,0,3,{poison:true,poisonTime:5,poisonDamage:5,pierce:true}));
+        }
+        w.cooldown=1;
+    }else if(w.type==="ring"){
+        const num=12;
+        for(let i=0;i<num;i++){
+            const ang=i*(Math.PI*2/num);
+            bullets.push(new Bullet(player.x,player.y,Math.cos(ang)*300,Math.sin(ang)*300,15));
+        }
+        w.cooldown=2;
+    }
 }
 
 /* ================= DRAW ================= */
 function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Player
-    ctx.fillStyle="blue"; ctx.beginPath(); ctx.arc(player.x,player.y,20,0,Math.PI*2); ctx.fill();
+    if(choosingWeapon){
+        ctx.fillStyle="black";ctx.font="30px Arial";ctx.fillText("Choose your starting weapon",canvas.width/2-200,canvas.height/2-100);
+        for(let i=0;i<weaponCards.length;i++){
+            const cx=canvas.width/2-150+i*150,cy=canvas.height/2-75;
+            ctx.fillStyle="lightgray";ctx.fillRect(cx,cy,100,100);
+            ctx.fillStyle="black";ctx.fillText(weaponCards[i],cx+10,cy+55);
+        }
+        return;
+    }
 
-    // Enemies
+    // player
+    ctx.fillStyle="blue";ctx.beginPath();ctx.arc(player.x,player.y,20,0,Math.PI*2);ctx.fill();
+
+    // enemies
     for(let e of enemies) e.draw(ctx);
 
-    // Bullets
-    ctx.fillStyle="black";
-    bullets.forEach(b=>ctx.beginPath(),ctx.arc(b.x,b.y,5,0,Math.PI*2),ctx.fill());
+    // bullets
+    bullets.forEach(b=>b.draw(ctx));
 
-    // Sidebar
-    ctx.fillStyle="black"; ctx.font="20px Arial";
-    ctx.fillText("HP: "+player.hp+"/"+player.maxHp,20,40);
+    // sidebar
+    ctx.fillStyle="black";ctx.font="20px Arial";
+    ctx.fillText("HP: "+Math.floor(player.hp)+"/"+player.maxHp,20,40);
     ctx.fillText("XP: "+player.xp,20,70);
     ctx.fillText("Level: "+player.level,20,100);
     ctx.fillText("Wave: "+(wave+1),20,130);
     ctx.fillText("Weapons:",20,170);
-    weapons.forEach((w,i)=>ctx.fillText("- "+w.type+" (Lv "+w.level+")",20,200+i*30));
+    player.weapons.forEach((w,i)=>ctx.fillText("- "+w.type+" (Lv "+w.level+")",20,200+i*30));
 }
+
+/* ================= MAIN LOOP ================= */
+let last=0;
+function gameLoop(ts){
+    const dt=(ts-last)/1000;
+    last=ts;
+    update(dt);
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>
