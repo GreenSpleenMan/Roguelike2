@@ -9,26 +9,18 @@
 </style>
 </head>
 <body>
-
 <canvas id="game"></canvas>
 
 <script>
 /* ============================================================
-    ROGUELIKE SHOOTER — SINGLE FILE EDITION (WITH STARTER WEAPON)
+    ROGUELIKE SHOOTER — SINGLE FILE EDITION (Functional Weapons)
 ============================================================ */
 
-
-
-/* ============================================================
-    CANVAS SETUP
-============================================================ */
+/* ================= CANVAS ================= */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
+function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
 window.onresize = resize;
 resize();
 
@@ -36,23 +28,15 @@ let keys = {};
 window.onkeydown = e => keys[e.key] = true;
 window.onkeyup   = e => keys[e.key] = false;
 
+/* ================= UTILS ================= */
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function angle(a,b){return Math.atan2(b.y-a.y,b.x-a.x);}
+function rand(min,max){return Math.random()*(max-min)+min;}
 
-
-/* ============================================================
-    UTILITY FUNCTIONS
-============================================================ */
-function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-function angle(a, b) { return Math.atan2(b.y - a.y, b.x - a.x); }
-function rand(min, max) { return Math.random() * (max-min) + min; }
-
-
-
-/* ============================================================
-    PLAYER
-============================================================ */
+/* ================= PLAYER ================= */
 const player = {
-    x: innerWidth / 2,
-    y: innerHeight / 2,
+    x: innerWidth/2,
+    y: innerHeight/2,
     speed: 250,
     hp: 100,
     maxHp: 100,
@@ -60,11 +44,7 @@ const player = {
     level: 1
 };
 
-
-
-/* ============================================================
-    ENEMY SYSTEM
-============================================================ */
+/* ================= ENEMIES ================= */
 const ENEMY_TYPES = {
     circle:   { speed:120, hp:40,  color:"red",      shape:"circle",   canBePoisoned:true  },
     triangle: { speed:200, hp:20,  color:"#ff7777",  shape:"triangle", canBePoisoned:true  },
@@ -75,220 +55,188 @@ const ENEMY_TYPES = {
 };
 
 class Enemy {
-    constructor(x, y, type) {
+    constructor(x,y,type){
         const t = ENEMY_TYPES[type];
-        this.x = x;
-        this.y = y;
-        this.type = type;
-        this.speed = t.speed;
-        this.hp = t.hp;
-        this.maxHp = t.hp;
-        this.color = t.color;
-        this.shape = t.shape;
+        this.x = x; this.y = y; this.type = type;
+        this.speed = t.speed; this.hp = t.hp; this.maxHp = t.hp;
+        this.color = t.color; this.shape = t.shape;
         this.canBePoisoned = t.canBePoisoned;
-        this.poisonTime = 0;
-        this.poisonDamage = 0;
+        this.poisonTime = 0; this.poisonDamage = 0;
     }
+    update(dt){
+        const ang = angle(this,player);
+        this.x += Math.cos(ang)*this.speed*dt;
+        this.y += Math.sin(ang)*this.speed*dt;
 
-    update(dt) {
-        const ang = angle(this, player);
-        this.x += Math.cos(ang) * this.speed * dt;
-        this.y += Math.sin(ang) * this.speed * dt;
+        if(this.poisonTime>0){ this.poisonTime-=dt; this.hp -= this.poisonDamage*dt; }
 
-        if (this.poisonTime > 0) {
-            this.poisonTime -= dt;
-            this.hp -= this.poisonDamage * dt;
+        // Enemy touches player
+        if(dist(this,player)<40){ 
+            player.hp -= 30*dt; // damage per second when touching
         }
     }
-
-    draw(ctx) {
-        ctx.fillStyle = (this.poisonTime > 0 && this.canBePoisoned) ? "green" : this.color;
+    draw(ctx){
+        ctx.fillStyle = (this.poisonTime>0 && this.canBePoisoned)?"green":this.color;
         ctx.beginPath();
-
-        switch (this.shape) {
-            case "circle":
-                ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
-                break;
-            case "triangle":
-                ctx.moveTo(this.x, this.y - 20);
-                ctx.lineTo(this.x + 20, this.y + 20);
-                ctx.lineTo(this.x - 20, this.y + 20);
-                ctx.closePath();
-                break;
-            case "square":
-                ctx.rect(this.x - 20, this.y - 20, 40, 40);
-                break;
+        switch(this.shape){
+            case "circle": ctx.arc(this.x,this.y,20,0,Math.PI*2); break;
+            case "triangle": ctx.moveTo(this.x,this.y-20); ctx.lineTo(this.x+20,this.y+20); ctx.lineTo(this.x-20,this.y+20); ctx.closePath(); break;
+            case "square": ctx.rect(this.x-20,this.y-20,40,40); break;
         }
-
         ctx.fill();
 
         // Health bar
-        const w = 40;
-        const h = 6;
-        const bx = this.x - w / 2;
-        const by = this.y - 32;
-
-        ctx.fillStyle = "black";
-        ctx.fillRect(bx - 1, by - 1, w + 2, h + 2);
-
-        ctx.fillStyle = "#660000";
-        ctx.fillRect(bx, by, w, h);
-
-        const pct = Math.max(0, this.hp / this.maxHp);
-        ctx.fillStyle = pct < 0.3 ? "red" : "limegreen";
-        ctx.fillRect(bx, by, w * pct, h);
+        const w=40,h=6,bx=this.x-w/2,by=this.y-32;
+        ctx.fillStyle="black"; ctx.fillRect(bx-1,by-1,w+2,h+2);
+        ctx.fillStyle="#660000"; ctx.fillRect(bx,by,w,h);
+        const pct=Math.max(0,this.hp/this.maxHp);
+        ctx.fillStyle=pct<0.3?"red":"limegreen"; ctx.fillRect(bx,by,w*pct,h);
     }
 }
 
-
-
-/* ============================================================
-    WAVE SYSTEM
-============================================================ */
-const WAVES = [
-    { circle: 5 },
-    { circle: 10, triangle: 1 },
-    { circle: 7, triangle: 3, square: 1 },
-    { circle: 10, triangle: 5, square: 2 },
-    { circle: 2, triangle: 10, square: 5 },
-    { circle: 5, triangle: 5, square: 5 },
-    { circle: 1, triangle: 2, square: 3, octagon: 1 },
-    { circle: 10, triangle: 5, square: 3, octagon: 3 },
-    { pentagon: 1 },
-    { circle:5, triangle:5, square:5, octagon:5, pentagon:5, hexagon:1 }
+/* ================= WAVES ================= */
+const WAVES=[
+    {circle:5},{circle:10,triangle:1},{circle:7,triangle:3,square:1},{circle:10,triangle:5,square:2},
+    {circle:2,triangle:10,square:5},{circle:5,triangle:5,square:5},{circle:1,triangle:2,square:3,octagon:1},
+    {circle:10,triangle:5,square:3,octagon:3},{pentagon:1},{circle:5,triangle:5,square:5,octagon:5,pentagon:5,hexagon:1}
 ];
+let wave=0; let enemies=[];
+function spawnWave(){
+    if(wave>=WAVES.length)return;
+    const config=WAVES[wave];
+    for(let type in config){
+        for(let i=0;i<config[type];i++){
+            let x,y,side=Math.floor(Math.random()*4);
+            if(side===0){x=0;y=rand(0,innerHeight);}
+            if(side===1){x=innerWidth;y=rand(0,innerHeight);}
+            if(side===2){x=rand(0,innerWidth);y=0;}
+            if(side===3){x=rand(0,innerWidth);y=innerHeight;}
+            enemies.push(new Enemy(x,y,type));
+        }
+    }
+}
+spawnWave();
 
-let wave = 0;
-let enemies = [];
+/* ================= WEAPONS ================= */
+let weapons=[];
+let bullets=[];
 
-function spawnWave() {
-    if (wave >= WAVES.length) return;
-
-    const config = WAVES[wave];
-    for (let type in config) {
-        for (let i = 0; i < config[type]; i++) {
-            let x, y;
-            let s = Math.floor(Math.random() * 4);
-
-            if (s === 0) { x = 0; y = rand(0, innerHeight); }
-            if (s === 1) { x = innerWidth; y = rand(0, innerHeight); }
-            if (s === 2) { x = rand(0, innerWidth); y = 0; }
-            if (s === 3) { x = rand(0, innerWidth); y = innerHeight; }
-
-            enemies.push(new Enemy(x, y, type));
+function addWeapon(type){weapons.push({type,level:1,cooldown:0});}
+function updateWeapons(dt){
+    for(let w of weapons){
+        w.cooldown-=dt;
+        if(keys[" "] && w.cooldown<=0){
+            if(w.type==="buckshot"){
+                for(let i=-2;i<=2;i++){
+                    const angleRad = i*0.2 + Math.atan2(mouseY-player.y,mouseX-player.x);
+                    bullets.push({x:player.x,y:player.y,dx:Math.cos(angleRad)*500,dy:Math.sin(angleRad)*500,dmg:10});
+                }
+                w.cooldown = 0.5;
+            }
+            if(w.type==="homeshot"){
+                if(enemies.length>0){
+                    let nearest=enemies[0],d=dist(player,enemies[0]);
+                    for(let e of enemies){let dd=dist(player,e); if(dd<d){nearest=e;d=dd;}}
+                    const ang = Math.atan2(nearest.y-player.y,nearest.x-player.x);
+                    bullets.push({x:player.x,y:player.y,dx:Math.cos(ang)*300,dy:Math.sin(ang)*300,dmg:15});
+                }
+                w.cooldown=0.4;
+            }
+            if(w.type==="orb"){
+                // simple rotating orb example
+                const num=1, radius=50;
+                for(let i=0;i<num;i++){
+                    const angleRad = Date.now()/300 + i*(Math.PI*2/num);
+                    bullets.push({x:player.x+Math.cos(angleRad)*radius, y:player.y+Math.sin(angleRad)*radius, dx:0, dy:0, dmg:20, lifetime:0.1});
+                }
+                w.cooldown=0.1;
+            }
         }
     }
 }
 
-spawnWave();
+/* ================= BULLETS ================= */
+function updateBullets(dt){
+    for(let i=bullets.length-1;i>=0;i--){
+        let b=bullets[i];
+        b.x+=b.dx*dt; b.y+=b.dy*dt;
+        if(b.lifetime!==undefined){b.lifetime-=dt; if(b.lifetime<=0){bullets.splice(i,1); continue;}}
 
+        // Collision with enemies
+        for(let j=enemies.length-1;j>=0;j--){
+            let e=enemies[j];
+            if(dist(b,e)<25){
+                e.hp-=b.dmg;
+                bullets.splice(i,1);
+                break;
+            }
+        }
 
-
-/* ============================================================
-    WEAPON SYSTEM
-    (Full weapon behaviors can be added next)
-============================================================ */
-let weapons = [];
-
-function addWeapon(type) {
-    weapons.push({ type, level: 1, cooldown: 0 });
-}
-
-function updateWeapons(dt) {
-    for (let w of weapons) {
-        w.cooldown -= dt;
-
-        // Weapon logic goes here (I can add them later)
+        // remove if offscreen
+        if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) bullets.splice(i,1);
     }
 }
 
-// ★★★ GIVE PLAYER RANDOM STARTING WEAPON ★★★
-const STARTING_WEAPONS = ["orb", "homeshot", "buckshot", "rocket", "zap", "scythe", "ring"];
-addWeapon( STARTING_WEAPONS[Math.floor(Math.random() * STARTING_WEAPONS.length)] );
+/* ================= STARTING WEAPON ================= */
+const STARTING_WEAPONS=["buckshot","homeshot","orb","rocket","zap","scythe","ring"];
+addWeapon(STARTING_WEAPONS[Math.floor(Math.random()*STARTING_WEAPONS.length)]);
 
-
-
-/* ============================================================
-    MAIN LOOP
-============================================================ */
-let last = 0;
-function gameLoop(ts) {
-    const dt = (ts - last) / 1000;
-    last = ts;
-
-    update(dt);
-    draw();
-
+/* ================= MAIN LOOP ================= */
+let last=0; let mouseX=innerWidth/2, mouseY=innerHeight/2;
+window.onmousemove = e => {mouseX=e.clientX; mouseY=e.clientY;}
+function gameLoop(ts){
+    const dt=(ts-last)/1000;
+    last=ts;
+    update(dt); draw();
     requestAnimationFrame(gameLoop);
 }
 requestAnimationFrame(gameLoop);
 
-
-
-/* ============================================================
-    UPDATE
-============================================================ */
-function update(dt) {
-    if (keys["w"]) player.y -= player.speed * dt;
-    if (keys["s"]) player.y += player.speed * dt;
-    if (keys["a"]) player.x -= player.speed * dt;
-    if (keys["d"]) player.x += player.speed * dt;
+/* ================= UPDATE ================= */
+function update(dt){
+    if(keys["w"]) player.y-=player.speed*dt;
+    if(keys["s"]) player.y+=player.speed*dt;
+    if(keys["a"]) player.x-=player.speed*dt;
+    if(keys["d"]) player.x+=player.speed*dt;
 
     updateWeapons(dt);
+    updateBullets(dt);
 
-    for (let e of enemies) e.update(dt);
+    for(let e of enemies) e.update(dt);
 
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        if (enemies[i].hp <= 0) {
-            player.xp += 10;
-            enemies.splice(i, 1);
-        }
+    for(let i=enemies.length-1;i>=0;i--){
+        if(enemies[i].hp<=0){player.xp+=10; enemies.splice(i,1);}
     }
 
-    if (enemies.length === 0) {
-        wave++;
-        if (wave < WAVES.length) spawnWave();
-    }
+    if(enemies.length===0){wave++; if(wave<WAVES.length)spawnWave();}
 
-    const need = player.level * 50;
-    if (player.xp >= need) {
-        player.xp -= need;
-        player.level++;
-        console.log("Level up!");
-    }
+    const need=player.level*50;
+    if(player.xp>=need){player.xp-=need; player.level++;}
 }
 
-
-
-/* ============================================================
-    DRAW
-============================================================ */
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+/* ================= DRAW ================= */
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
     // Player
-    ctx.fillStyle = "blue";
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, 20, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle="blue"; ctx.beginPath(); ctx.arc(player.x,player.y,20,0,Math.PI*2); ctx.fill();
 
     // Enemies
-    for (let e of enemies) e.draw(ctx);
+    for(let e of enemies) e.draw(ctx);
 
-    // Sidebar UI
-    ctx.fillStyle = "black";
-    ctx.font = "20px Arial";
-    ctx.fillText("HP: " + player.hp + "/" + player.maxHp, 20, 40);
-    ctx.fillText("XP: " + player.xp, 20, 70);
-    ctx.fillText("Level: " + player.level, 20, 100);
-    ctx.fillText("Wave: " + (wave + 1), 20, 130);
+    // Bullets
+    ctx.fillStyle="black";
+    bullets.forEach(b=>ctx.beginPath(),ctx.arc(b.x,b.y,5,0,Math.PI*2),ctx.fill());
 
-    ctx.fillText("Weapons:", 20, 170);
-    weapons.forEach((w, i) => {
-        ctx.fillText("- " + w.type + " (Lv " + w.level + ")", 20, 200 + i * 30);
-    });
+    // Sidebar
+    ctx.fillStyle="black"; ctx.font="20px Arial";
+    ctx.fillText("HP: "+player.hp+"/"+player.maxHp,20,40);
+    ctx.fillText("XP: "+player.xp,20,70);
+    ctx.fillText("Level: "+player.level,20,100);
+    ctx.fillText("Wave: "+(wave+1),20,130);
+    ctx.fillText("Weapons:",20,170);
+    weapons.forEach((w,i)=>ctx.fillText("- "+w.type+" (Lv "+w.level+")",20,200+i*30));
 }
-
 </script>
 </body>
 </html>
