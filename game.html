@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Roguelike Shooter</title>
+<style>
+    body { margin:0; overflow:hidden; background:white; }
+    canvas { display:block; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<script>
+/* ============================================================
+    ROGUELIKE SHOOTER — SINGLE FILE EDITION
+    All systems are separated into clear blocks for easy editing
+============================================================ */
+
+
+
+/* ============================================================
+    ========== CANVAS & BASIC SETUP ==========
+============================================================ */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.onresize = resize;
+resize();
+
+let keys = {};
+window.onkeydown = e => keys[e.key] = true;
+window.onkeyup   = e => keys[e.key] = false;
+
+
+
+/* ============================================================
+    ========== UTILITY FUNCTIONS ==========
+============================================================ */
+function dist(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+}
+function angle(a, b) {
+    return Math.atan2(b.y - a.y, b.x - a.x);
+}
+function rand(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+
+
+/* ============================================================
+    ========== PLAYER ==========
+============================================================ */
+const player = {
+    x: innerWidth / 2,
+    y: innerHeight / 2,
+    speed: 250,
+    hp: 100,
+    maxHp: 100,
+    xp: 0,
+    level: 1
+};
+
+
+
+/* ============================================================
+    ========== ENEMY SYSTEM ==========
+    - Easy to add new enemies
+============================================================ */
+
+const ENEMY_TYPES = {
+    circle:   { speed:120, hp:40,  color:"red",      shape:"circle",   canBePoisoned:true },
+    triangle: { speed:200, hp:20,  color:"#ff7777",  shape:"triangle", canBePoisoned:true },
+    square:   { speed:70,  hp:100, color:"#990000",  shape:"square",   canBePoisoned:true },
+    octagon:  { speed:120, hp:120, color:"green",    shape:"circle",   canBePoisoned:false },
+    pentagon: { speed:180, hp:60,  color:"purple",   shape:"circle",   canBePoisoned:true },
+    hexagon:  { speed:50,  hp:400, color:"yellow",   shape:"circle",   canBePoisoned:true }
+};
+
+class Enemy {
+    constructor(x, y, type) {
+        const t = ENEMY_TYPES[type];
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.speed = t.speed;
+        this.hp = t.hp;
+        this.maxHp = t.hp;
+        this.color = t.color;
+        this.shape = t.shape;
+        this.canBePoisoned = t.canBePoisoned;
+
+        this.poisonTime = 0;
+        this.poisonDamage = 0;
+    }
+
+    update(dt) {
+        const ang = angle(this, player);
+        this.x += Math.cos(ang) * this.speed * dt;
+        this.y += Math.sin(ang) * this.speed * dt;
+
+        if (this.poisonTime > 0) {
+            this.poisonTime -= dt;
+            this.hp -= this.poisonDamage * dt;
+        }
+    }
+
+    draw(ctx) {
+        // Enemy shape
+        ctx.fillStyle = (this.poisonTime > 0 && this.canBePoisoned) ? "green" : this.color;
+        ctx.beginPath();
+
+        switch (this.shape) {
+            case "circle":
+                ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
+                break;
+
+            case "triangle":
+                ctx.moveTo(this.x, this.y - 20);
+                ctx.lineTo(this.x + 20, this.y + 20);
+                ctx.lineTo(this.x - 20, this.y + 20);
+                ctx.closePath();
+                break;
+
+            case "square":
+                ctx.rect(this.x - 20, this.y - 20, 40, 40);
+                break;
+        }
+
+        ctx.fill();
+
+        // Health bar
+        const w = 40;
+        const h = 6;
+        const bx = this.x - w / 2;
+        const by = this.y - 32;
+
+        ctx.fillStyle = "black";
+        ctx.fillRect(bx - 1, by - 1, w + 2, h + 2);
+
+        ctx.fillStyle = "#660000";
+        ctx.fillRect(bx, by, w, h);
+
+        const pct = Math.max(0, this.hp / this.maxHp);
+        ctx.fillStyle = pct < 0.3 ? "red" : "limegreen";
+        ctx.fillRect(bx, by, w * pct, h);
+    }
+}
+
+
+
+/* ============================================================
+    ========== WAVE SYSTEM ==========
+    - Easy to add or edit waves
+============================================================ */
+const WAVES = [
+    { circle: 5 },
+    { circle: 10, triangle: 1 },
+    { circle: 7, triangle: 3, square: 1 },
+    { circle: 10, triangle: 5, square: 2 },
+    { circle: 2, triangle: 10, square: 5 },
+    { circle: 5, triangle: 5, square: 5 },
+    { circle: 1, triangle: 2, square: 3, octagon: 1 },
+    { circle: 10, triangle: 5, square: 3, octagon: 3 },
+    { pentagon: 1 },
+    { circle:5, triangle:5, square:5, octagon:5, pentagon:5, hexagon:1 }
+];
+
+let wave = 0;
+let enemies = [];
+
+function spawnWave() {
+    if (wave >= WAVES.length) return;
+
+    const config = WAVES[wave];
+    for (let type in config) {
+        for (let i = 0; i < config[type]; i++) {
+            let x, y;
+            let side = Math.floor(Math.random() * 4);
+
+            if (side === 0) { x = 0; y = rand(0, innerHeight); }
+            if (side === 1) { x = innerWidth; y = rand(0, innerHeight); }
+            if (side === 2) { x = rand(0, innerWidth); y = 0; }
+            if (side === 3) { x = rand(0, innerWidth); y = innerHeight; }
+
+            enemies.push(new Enemy(x, y, type));
+        }
+    }
+}
+
+spawnWave();
+
+
+
+/* ============================================================
+    ========== WEAPON SYSTEM ==========
+    (Stub — easy to fill in)
+============================================================ */
+let weapons = [];
+
+function addWeapon(type) {
+    weapons.push({ type, cooldown: 0, level: 1 });
+}
+
+function updateWeapons(dt) {
+    for (let w of weapons) {
+        w.cooldown -= dt;
+
+        // Weapon logic goes here
+        // I can fully implement these for you next
+    }
+}
+
+
+
+/* ============================================================
+    ========== MAIN GAME LOOP ==========
+============================================================ */
+
+let last = 0;
+function gameLoop(ts) {
+    const dt = (ts - last) / 1000;
+    last = ts;
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+
+
+/* ============================================================
+    UPDATE
+============================================================ */
+function update(dt) {
+    // Player movement
+    if (keys["w"]) player.y -= player.speed * dt;
+    if (keys["s"]) player.y += player.speed * dt;
+    if (keys["a"]) player.x -= player.speed * dt;
+    if (keys["d"]) player.x += player.speed * dt;
+
+    // Update weapons
+    updateWeapons(dt);
+
+    // Enemies
+    for (let e of enemies) e.update(dt);
+
+    // Cleanup dead
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        if (enemies[i].hp <= 0) {
+            player.xp += 10;
+            enemies.splice(i, 1);
+        }
+    }
+
+    // Next wave
+    if (enemies.length === 0) {
+        wave++;
+        if (wave < WAVES.length) spawnWave();
+    }
+
+    // Leveling
+    const need = player.level * 50;
+    if (player.xp >= need) {
+        player.xp -= need;
+        player.level++;
+        console.log("Level up!");
+    }
+}
+
+
+
+/* ============================================================
+    DRAW
+============================================================ */
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Player
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, 20, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Enemies
+    for (let e of enemies) e.draw(ctx);
+
+    // Sidebar UI
+    ctx.fillStyle = "black";
+    ctx.font = "20px Arial";
+    ctx.fillText("HP: " + player.hp + "/" + player.maxHp, 20, 40);
+    ctx.fillText("XP: " + player.xp, 20, 70);
+    ctx.fillText("Level: " + player.level, 20, 100);
+    ctx.fillText("Wave: " + (wave + 1), 20, 130);
+
+    ctx.fillText("Weapons:", 20, 170);
+    weapons.forEach((w, i) => {
+        ctx.fillText("- " + w.type + " (Lv " + w.level + ")", 20, 200 + i * 30);
+    });
+}
+
+</script>
+</body>
+</html>
